@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>南山生 座席予約システム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f1ea; --surface:#ffffff; --ink:#1d2430; --muted:#64707d; --line:#d8d2c2;
+  --accent:#9c2b2b; --accent-ink:#ffffff; --err:#b3261e; --err-bg:#fbeceb;
+  --seatE:#e7e2d3; --seatE-b:#c9c2ac; --seatT:#cfcfd4; --seatSel:#9c2b2b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#15181d; --surface:#1f242b; --ink:#eceef1; --muted:#9aa4b0; --line:#333a44; --accent:#e4625f; --accent-ink:#1a0d0d; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatT:#454c57;}
+}
+:root[data-theme="dark"]{--bg:#15181d; --surface:#1f242b; --ink:#eceef1; --muted:#9aa4b0; --line:#333a44; --accent:#e4625f; --accent-ink:#1a0d0d; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatT:#454c57;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7}
+.wrap{max-width:560px;margin:0 auto;padding:28px 18px 60px}
+h1{font-family:"Shippori Mincho",serif;font-size:22px;margin:0 0 4px}
+h2{font-family:"Shippori Mincho",serif;font-size:19px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:grid;gap:4px;margin-bottom:16px}
+label{font-size:14px;font-weight:700}
+input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.err{color:var(--err);font-size:13px;display:none}
+.field.invalid input,.field.invalid select{border-color:var(--err);background:var(--err-bg)}
+.field.invalid .err{display:block}
+.hintTxt{color:var(--muted);font-size:12px;margin:2px 0 0}
+.btn{width:100%;font:inherit;font-weight:700;font-size:16px;padding:14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.row{display:flex;gap:10px;margin-top:6px}
+.link{display:inline-block;margin-top:14px;font-size:14px;color:var(--accent);text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
+.note{margin-top:18px;padding:12px 14px;border-left:4px solid var(--accent);background:var(--surface);border-radius:0 6px 6px 0;font-size:13px;color:var(--muted)}
+.screen{display:none}
+.screen.on{display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 14px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:14px;height:14px;border-radius:4px;display:inline-block}
+.dot.e{background:var(--seatE);border:1px solid var(--seatE-b)}
+.dot.t{background:var(--seatT)}
+.dot.s{background:var(--seatSel)}
+.screenLabel{text-align:center;font-size:12px;color:var(--muted);margin:0 0 14px;border-bottom:1px dashed var(--line);padding-bottom:10px}
+.rows{display:grid;gap:10px;margin-bottom:16px}
+.srow{display:flex;align-items:center;gap:10px}
+.rlabel{width:20px;font-size:12px;color:var(--muted);font-weight:700}
+.seats{display:flex;gap:4px}
+.blk{display:flex;gap:4px;padding:3px;border-radius:6px}
+.seat{width:28px;height:28px;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);cursor:pointer;font-size:0}
+.seat.taken{background:var(--seatT);border-color:var(--seatT);cursor:not-allowed}
+.seat.sel{background:var(--seatSel);border-color:var(--seatSel)}
+.selSummary{font-size:14px;margin:4px 0 16px;min-height:1.4em}
+.ticket{border:2px dashed var(--accent);border-radius:10px;padding:20px;text-align:center}
+.resno{font-size:13px;color:var(--muted);letter-spacing:.08em}
+#qr{display:flex;justify-content:center;margin:12px 0}
+.tinfo{text-align:left;font-size:14px;margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+.tinfo div{display:flex;justify-content:space-between;padding:3px 0}
+.tinfo b{font-weight:700}
+@media print{
+  body *{visibility:hidden}
+  #screen-ticket,#screen-ticket *{visibility:visible}
+  #screen-ticket{position:absolute;left:0;top:0;width:100%}
+  .link,.btn,.note{display:none!important}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<section class="screen on" id="screen-form">
+  <h1>南山生 座席予約システム</h1>
+  <p class="sub">必要事項を入力してください。</p>
+  <form class="card" id="form" novalidate>
+    <div class="row2">
+      <div class="field" id="f-lastName"><label>姓</label><input id="lastName" autocomplete="family-name"><p class="err"></p></div>
+      <div class="field" id="f-firstName"><label>名</label><input id="firstName" autocomplete="given-name"><p class="err"></p></div>
+    </div>
+    <div class="row2">
+      <div class="field" id="f-lastFurigana"><label>せい（ふりがな）</label><input id="lastFurigana"><p class="err"></p></div>
+      <div class="field" id="f-firstFurigana"><label>めい（ふりがな）</label><input id="firstFurigana"><p class="err"></p></div>
+    </div>
+    <div class="row2">
+      <div class="field" id="f-grade"><label>学年</label>
+        <select id="grade"><option value="">選択してください</option>
+          <option>J1</option><option>J2</option><option>J3</option>
+          <option>S1</option><option>S2</option><option>S3</option>
+        </select><p class="err"></p></div>
+      <div class="field" id="f-cls"><label>クラス</label>
+        <select id="cls"><option value="">選択してください</option>
+          <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+        </select><p class="err"></p></div>
+    </div>
+    <div class="field" id="f-studentId">
+      <label>学籍番号（7桁）</label>
+      <input id="studentId" inputmode="numeric" maxlength="7" placeholder="例：2024015">
+      <p class="hintTxt">最初の4桁＝入学年度（2021〜2026）、最後の3桁＝通し番号（001〜220）</p>
+      <p class="err"></p>
+    </div>
+    <div class="field" id="f-birthdate"><label>生年月日</label><input id="birthdate" type="date"><p class="err"></p></div>
+    <button class="btn" type="submit">座席を選ぶ</button>
+  </form>
+  <button class="link" type="button" data-go="cancel">予約のキャンセル・変更はこちら</button>
+</section>
+
+<section class="screen" id="screen-seats">
+  <h1>座席を選択</h1>
+  <p class="screenLabel">スクリーン側</p>
+  <div class="legend"><span><i class="dot e"></i>空席</span><span><i class="dot t"></i>予約済み</span><span><i class="dot s"></i>選択中</span></div>
+  <div class="card">
+    <div class="rows" id="rows"></div>
+    <p class="selSummary" id="selSummary">席を選んでください。</p>
+    <div class="row">
+      <button class="btn ghost" type="button" id="backToForm">戻る</button>
+      <button class="btn" type="button" id="confirmSeat" disabled>この席で予約を確定する</button>
+    </div>
+    <p class="err" id="seatErr" style="margin-top:10px"></p>
+  </div>
+</section>
+
+<section class="screen" id="screen-ticket">
+  <h1>入場券</h1>
+  <div class="card ticket">
+    <div class="resno" id="t-resno">予約番号 ----</div>
+    <div id="qr"></div>
+    <div class="tinfo">
+      <div><span>氏名</span><b id="t-name"></b></div>
+      <div><span>学年・クラス</span><b id="t-class"></b></div>
+      <div><span>学籍番号</span><b id="t-sid"></b></div>
+      <div><span>座席</span><b id="t-seat"></b></div>
+    </div>
+  </div>
+  <p class="note">入場にはQRコードをタブレット等の端末での呈示が必要です。プリントアウトしたQRコードで入場することもできます。</p>
+  <button class="btn" type="button" onclick="window.print()">印刷する</button>
+  <button class="link" type="button" data-go="cancel">予約のキャンセル・変更はこちら</button>
+</section>
+
+<section class="screen" id="screen-cancel">
+  <h1>予約のキャンセル・変更</h1>
+  <p class="sub">本人確認のため、ふりがな・学籍番号・生年月日を入力してください。一致した予約のみキャンセルできます。</p>
+  <div class="card">
+    <div class="row2">
+      <div class="field" id="f-c-lastFurigana"><label>せい（ふりがな）</label><input id="c-lastFurigana"><p class="err"></p></div>
+      <div class="field" id="f-c-firstFurigana"><label>めい（ふりがな）</label><input id="c-firstFurigana"><p class="err"></p></div>
+    </div>
+    <div class="field" id="f-c-studentId"><label>学籍番号（7桁）</label><input id="c-studentId" inputmode="numeric" maxlength="7"><p class="err"></p></div>
+    <div class="field" id="f-c-birthdate"><label>生年月日</label><input id="c-birthdate" type="date"><p class="err"></p></div>
+    <button class="btn" type="button" id="searchBtn">確認する</button>
+  </div>
+  <button class="link" type="button" data-go="form">予約画面にもどる</button>
+  <div class="card" id="cancelResult" style="display:none;margin-top:16px"></div>
+</section>
+
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, runTransaction,
+  onSnapshot, collection, query, where, getDocs
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCcjISrD6HsF0EsrA6i8uoqK4XAUfsJFTc",
+  authDomain: "seat-reserve-94e1f.firebaseapp.com",
+  projectId: "seat-reserve-94e1f",
+  storageBucket: "seat-reserve-94e1f.firebasestorage.app",
+  messagingSenderId: "975102672764",
+  appId: "1:975102672764:web:3a0850eba04315abdf2ef9"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* ---- バリデーション ---- */
+function toHalf(s){return String(s==null?'':s).normalize('NFKC');}
+function validateStudentId(id){
+  const s=toHalf(id).trim();
+  if(!/^\d{7}$/.test(s))return'学籍番号は数字7桁で入力してください。';
+  const year=parseInt(s.slice(0,4),10),num=parseInt(s.slice(4,7),10);
+  if(year<2021||year>2026)return'入学年度（最初の4桁）が正しくありません（2021〜2026）。';
+  if(num<1||num>220)return'通し番号（最後の3桁）が正しくありません（001〜220）。';
+  return null;
+}
+function validateFurigana(s){
+  const v=toHalf(s).trim();
+  if(!v)return'ふりがなを入力してください。';
+  if(!/^[ぁ-んー\s]+$/u.test(v))return'ふりがなはひらがなで入力してください。';
+  return null;
+}
+function validateForm(f){
+  const errors={};
+  if(!f.lastName||!f.lastName.trim())errors.lastName='姓を入力してください。';
+  if(!f.firstName||!f.firstName.trim())errors.firstName='名を入力してください。';
+  const lf=validateFurigana(f.lastFurigana);if(lf)errors.lastFurigana=lf;
+  const ff=validateFurigana(f.firstFurigana);if(ff)errors.firstFurigana=ff;
+  if(!f.grade)errors.grade='学年を選んでください。';
+  if(!f.cls)errors.cls='クラスを選んでください。';
+  const idErr=validateStudentId(f.studentId);if(idErr)errors.studentId=idErr;
+  if(!f.birthdate)errors.birthdate='生年月日を入力してください。';
+  return errors;
+}
+function seatList(){const rows=['A','B','C'];const out=[];rows.forEach(r=>{for(let c=1;c<=10;c++)out.push(r+c);});return out;}
+function formatResNo(n){return String(n).padStart(4,'0');}
+function qrToken(resNo,seat){return 'NANZAN-KOENKAI|'+formatResNo(resNo)+'|'+seat;}
+
+/* ---- 画面切り替え ---- */
+const $=s=>document.querySelector(s);
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$('#'+id).classList.add('on');window.scrollTo(0,0);}
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>show('screen-'+b.dataset.go)));
+
+/* ---- ステップ1：入力フォーム ---- */
+const ids=['lastName','firstName','lastFurigana','firstFurigana','grade','cls','studentId','birthdate'];
+let formData=null;
+$('#form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const f={};ids.forEach(id=>f[id]=$('#'+id).value);
+  const errors=validateForm(f);
+  ids.forEach(id=>{
+    const wrap=$('#f-'+id);
+    if(errors[id]){wrap.classList.add('invalid');wrap.querySelector('.err').textContent=errors[id];}
+    else wrap.classList.remove('invalid');
+  });
+  if(Object.keys(errors).length===0){
+    formData=f;show('screen-seats');startSeatListener();
+  }else{
+    $('#f-'+Object.keys(errors)[0]).scrollIntoView({behavior:'smooth',block:'center'});
+  }
+});
+
+/* ---- ステップ2：座席選択 ---- */
+let seatStatus={};let selectedSeat=null;let unsub=null;
+function renderSeats(){
+  const rows=['A','B','C'];
+  $('#rows').innerHTML='';
+  rows.forEach(r=>{
+    const srow=document.createElement('div');srow.className='srow';
+    srow.innerHTML='<span class="rlabel">'+r+'</span>';
+    const seatsWrap=document.createElement('div');seatsWrap.className='seats';
+    for(let b=0;b<5;b++){
+      const blk=document.createElement('div');blk.className='blk';
+      for(let i=1;i<=2;i++){
+        const c=b*2+i;const id=r+c;
+        const el=document.createElement('button');el.type='button';el.className='seat';el.textContent=id;el.title=id;
+        const taken=!!seatStatus[id];
+        if(taken)el.classList.add('taken');
+        if(selectedSeat===id)el.classList.add('sel');
+        el.disabled=taken;
+        el.addEventListener('click',()=>{selectedSeat=id;renderSeats();updateSummary();});
+        blk.appendChild(el);
+      }
+      seatsWrap.appendChild(blk);
+    }
+    srow.appendChild(seatsWrap);$('#rows').appendChild(srow);
+  });
+}
+function updateSummary(){
+  $('#selSummary').textContent=selectedSeat?('選択中の席：'+selectedSeat):'席を選んでください。';
+  $('#confirmSeat').disabled=!selectedSeat;
+}
+function startSeatListener(){
+  if(unsub)return;
+  unsub=onSnapshot(collection(db,'seats'),snap=>{
+    seatStatus={};
+    snap.forEach(d=>{const v=d.data();if(v.status==='reserved')seatStatus[d.id]=true;});
+    if(selectedSeat&&seatStatus[selectedSeat])selectedSeat=null;
+    renderSeats();updateSummary();
+  });
+}
+$('#backToForm').addEventListener('click',()=>show('screen-form'));
+$('#confirmSeat').addEventListener('click', async ()=>{
+  if(!selectedSeat||!formData)return;
+  $('#confirmSeat').disabled=true;$('#seatErr').textContent='';
+  const seat=selectedSeat;
+  try{
+    const resNo=await runTransaction(db, async tx=>{
+      const seatRef=doc(db,'seats',seat);
+      const seatSnap=await tx.get(seatRef);
+      if(seatSnap.exists()&&seatSnap.data().status==='reserved')throw new Error('TAKEN');
+      const counterRef=doc(db,'meta','counter');
+      const counterSnap=await tx.get(counterRef);
+      const next=counterSnap.exists()?(counterSnap.data().next||1):1;
+      tx.set(counterRef,{next:next+1});
+      tx.set(seatRef,{
+        status:'reserved',resNo:next,checkedIn:false,createdAt:Date.now(),
+        lastName:formData.lastName,firstName:formData.firstName,
+        lastFurigana:formData.lastFurigana,firstFurigana:formData.firstFurigana,
+        grade:formData.grade,cls:formData.cls,studentId:formData.studentId,birthdate:formData.birthdate
+      });
+      return next;
+    });
+    showTicket(resNo,seat,formData);
+  }catch(err){
+    if(err&&err.message==='TAKEN'){$('#seatErr').textContent='その席はちょうど他の人が予約しました。別の席を選んでください。';selectedSeat=null;renderSeats();updateSummary();}
+    else{$('#seatErr').textContent='通信エラーが発生しました。もう一度お試しください。';$('#confirmSeat').disabled=false;}
+  }
+});
+
+/* ---- ステップ3：チケット ---- */
+function showTicket(resNo,seat,f){
+  $('#t-resno').textContent='予約番号 '+formatResNo(resNo);
+  $('#t-name').textContent=f.lastName+' '+f.firstName+'（'+f.lastFurigana+' '+f.firstFurigana+'）';
+  $('#t-class').textContent=f.grade+' '+f.cls+'組';
+  $('#t-sid').textContent=f.studentId;
+  $('#t-seat').textContent=seat;
+  $('#qr').innerHTML='';
+  new QRCode($('#qr'),{text:qrToken(resNo,seat),width:160,height:160});
+  show('screen-ticket');
+}
+
+/* ---- キャンセル ---- */
+const cids=['c-lastFurigana','c-firstFurigana','c-studentId','c-birthdate'];
+let foundSeatId=null;
+$('#searchBtn').addEventListener('click', async ()=>{
+  const f={lastFurigana:$('#c-lastFurigana').value,firstFurigana:$('#c-firstFurigana').value,studentId:$('#c-studentId').value,birthdate:$('#c-birthdate').value};
+  const errors={};
+  const lf=validateFurigana(f.lastFurigana);if(lf)errors['c-lastFurigana']=lf;
+  const ff=validateFurigana(f.firstFurigana);if(ff)errors['c-firstFurigana']=ff;
+  const idErr=validateStudentId(f.studentId);if(idErr)errors['c-studentId']=idErr;
+  if(!f.birthdate)errors['c-birthdate']='生年月日を入力してください。';
+  cids.forEach(id=>{
+    const wrap=$('#f-'+id);
+    if(errors[id]){wrap.classList.add('invalid');wrap.querySelector('.err').textContent=errors[id];}
+    else wrap.classList.remove('invalid');
+  });
+  if(Object.keys(errors).length)return;
+  $('#searchBtn').disabled=true;
+  const box=$('#cancelResult');box.style.display='block';box.innerHTML='検索しています…';
+  try{
+    const q=query(collection(db,'seats'),where('studentId','==',toHalf(f.studentId).trim()));
+    const snap=await getDocs(q);
+    let hit=null;
+    snap.forEach(d=>{
+      const v=d.data();
+      if(v.status==='reserved'&&v.lastFurigana===f.lastFurigana.trim()&&v.firstFurigana===f.firstFurigana.trim()&&v.birthdate===f.birthdate){hit={id:d.id,...v};}
+    });
+    if(!hit){box.innerHTML='一致する予約が見つかりませんでした。入力内容をご確認ください。';}
+    else{
+      foundSeatId=hit.id;
+      box.innerHTML=
+        '<p><b>予約番号 '+formatResNo(hit.resNo)+'</b><br>'+
+        hit.lastName+' '+hit.firstName+'　'+hit.grade+' '+hit.cls+'組　座席：'+hit.id+'</p>'+
+        '<button class="btn" type="button" id="doCancelBtn">このご予約をキャンセルする</button>'+
+        '<p class="note">変更したい場合は、一度キャンセルしてから、もう一度予約画面からご登録ください。</p>';
+      $('#doCancelBtn').addEventListener('click', async ()=>{
+        $('#doCancelBtn').disabled=true;
+        await updateDoc(doc(db,'seats',foundSeatId),{status:'empty',resNo:null,checkedIn:false,lastName:null,firstName:null,lastFurigana:null,firstFurigana:null,grade:null,cls:null,studentId:null,birthdate:null});
+        box.innerHTML='キャンセルが完了しました。';
+      });
+    }
+  }catch(e){
+    box.innerHTML='通信エラーが発生しました。もう一度お試しください。';
+  }finally{
+    $('#searchBtn').disabled=false;
+  }
+});
+</script>
+</body>
+</html>
