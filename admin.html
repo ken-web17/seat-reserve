@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>運営用：座席予約管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f1ea; --surface:#ffffff; --ink:#1d2430; --muted:#64707d; --line:#d8d2c2;
+  --accent:#9c2b2b; --accent-ink:#ffffff;
+  --ok:#1b7a3d; --ok-bg:#e7f5ec; --warn:#9c6b0c; --warn-bg:#fbf1d8; --err:#b3261e; --err-bg:#fbeceb;
+  --seatE:#e7e2d3; --seatE-b:#c9c2ac; --seatR:#e3b341; --seatC:#4fae6a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#15181d; --surface:#1f242b; --ink:#eceef1; --muted:#9aa4b0; --line:#333a44; --accent:#e4625f;
+    --ok:#6fd499; --ok-bg:#163826; --warn:#e3b341; --warn-bg:#352a0f; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatR:#b68a2d; --seatC:#2f7a4c;}
+}
+:root[data-theme="dark"]{--bg:#15181d; --surface:#1f242b; --ink:#eceef1; --muted:#9aa4b0; --line:#333a44; --accent:#e4625f;
+  --ok:#6fd499; --ok-bg:#163826; --warn:#e3b341; --warn-bg:#352a0f; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatR:#b68a2d; --seatC:#2f7a4c;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7}
+.wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+h1{font-family:"Shippori Mincho",serif;font-size:21px;margin:0 0 16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+input,select{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.btn{font:inherit;font-weight:700;font-size:15px;padding:10px 18px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.small{font-size:13px;padding:6px 12px}
+.btn:disabled{opacity:.5;cursor:default}
+.gate{max-width:360px;margin:80px auto;text-align:center}
+.gate input{width:100%;text-align:center;margin:12px 0;letter-spacing:.2em}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tab{font:inherit;font-weight:700;font-size:14px;padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.panel{display:none}
+.panel.on{display:block}
+#reader{max-width:360px;margin:0 auto 14px;border-radius:8px;overflow:hidden}
+.result{padding:16px;border-radius:8px;text-align:center;font-size:17px;font-weight:700;margin-bottom:14px;display:none}
+.result.ok{display:block;background:var(--ok-bg);color:var(--ok)}
+.result.warn{display:block;background:var(--warn-bg);color:var(--warn)}
+.result.err{display:block;background:var(--err-bg);color:var(--err)}
+.result p{margin:4px 0 0;font-size:13px;font-weight:400}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.bar input{flex:1;min-width:160px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:700}
+.chip{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.chip.r{background:var(--warn-bg);color:var(--warn)}
+.chip.c{background:var(--ok-bg);color:var(--ok)}
+.tblwrap{overflow-x:auto}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 14px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:14px;height:14px;border-radius:4px;display:inline-block}
+.dot.e{background:var(--seatE);border:1px solid var(--seatE-b)}
+.dot.r{background:var(--seatR)}
+.dot.c{background:var(--seatC)}
+.rows{display:grid;gap:10px;margin-bottom:10px}
+.srow{display:flex;align-items:center;gap:10px}
+.rlabel{width:20px;font-size:12px;color:var(--muted);font-weight:700}
+.seats{display:flex;gap:4px}
+.blk{display:flex;gap:4px;padding:3px;border-radius:6px}
+.seat2{width:30px;height:30px;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);font-size:9px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.seat2.r{background:var(--seatR);border-color:var(--seatR);color:#1a1405}
+.seat2.c{background:var(--seatC);border-color:var(--seatC);color:#06240f}
+.forceCard{margin-top:18px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:grid;gap:4px;margin-bottom:12px}
+label{font-size:13px;font-weight:700}
+.err{color:var(--err);font-size:12px;display:none}
+.field.invalid input,.field.invalid select{border-color:var(--err)}
+.field.invalid .err{display:block}
+.msg{font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <h1>運営用パスコード</h1>
+  <input id="passInput" type="password" placeholder="パスコード" inputmode="numeric">
+  <button class="btn" id="passBtn" style="width:100%">入る</button>
+  <p class="err" id="passErr" style="display:block;min-height:1.4em"></p>
+</div>
+
+<main class="wrap" id="app" style="display:none">
+  <h1>運営用：座席予約管理</h1>
+  <div class="tabs">
+    <button class="tab on" data-tab="checkin">QRチェックイン</button>
+    <button class="tab" data-tab="list">予約一覧・手動対応</button>
+    <button class="tab" data-tab="map">座席マップ</button>
+  </div>
+
+  <section class="panel on" id="panel-checkin">
+    <div class="card">
+      <div id="result" class="result"></div>
+      <div id="reader"></div>
+      <div style="text-align:center">
+        <button class="btn" id="camStart">カメラを起動する</button>
+        <button class="btn ghost" id="camStop" style="display:none">カメラを止める</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-list">
+    <div class="card">
+      <div class="bar">
+        <input id="search" placeholder="氏名・学籍番号・座席・予約番号で検索">
+      </div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>予約番号</th><th>座席</th><th>氏名</th><th>学年/組</th><th>学籍番号</th><th>生年月日</th><th>受付</th><th>操作</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p class="msg" id="listMsg"></p>
+    </div>
+    <div class="card forceCard">
+      <h2 style="font-family:'Shippori Mincho',serif;font-size:16px;margin:0 0 10px">空席に強制予約する</h2>
+      <div class="row2">
+        <div class="field" id="f-fLastName"><label>姓</label><input id="fLastName"><p class="err"></p></div>
+        <div class="field" id="f-fFirstName"><label>名</label><input id="fFirstName"><p class="err"></p></div>
+      </div>
+      <div class="row2">
+        <div class="field" id="f-fLastFurigana"><label>せい（ふりがな）</label><input id="fLastFurigana"><p class="err"></p></div>
+        <div class="field" id="f-fFirstFurigana"><label>めい（ふりがな）</label><input id="fFirstFurigana"><p class="err"></p></div>
+      </div>
+      <div class="row2">
+        <div class="field" id="f-fGrade"><label>学年</label>
+          <select id="fGrade"><option value="">選択</option><option>J1</option><option>J2</option><option>J3</option><option>S1</option><option>S2</option><option>S3</option></select><p class="err"></p></div>
+        <div class="field" id="f-fCls"><label>クラス</label>
+          <select id="fCls"><option value="">選択</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select><p class="err"></p></div>
+      </div>
+      <div class="row2">
+        <div class="field" id="f-fStudentId"><label>学籍番号（7桁）</label><input id="fStudentId" inputmode="numeric" maxlength="7"><p class="err"></p></div>
+        <div class="field" id="f-fBirthdate"><label>生年月日</label><input id="fBirthdate" type="date"><p class="err"></p></div>
+      </div>
+      <div class="field" id="f-fSeat"><label>座席</label><select id="fSeat"></select><p class="err"></p></div>
+      <button class="btn" id="forceBtn">この内容で予約する</button>
+      <p class="msg" id="forceMsg"></p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-map">
+    <div class="card">
+      <div class="legend"><span><i class="dot e"></i>空席</span><span><i class="dot r"></i>予約済み（未受付）</span><span><i class="dot c"></i>受付済み</span></div>
+      <div class="rows" id="mapRows"></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, updateDoc, deleteField, runTransaction, onSnapshot, collection
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* ここを変えれば、運営用パスコードを変更できます */
+const ADMIN_PASSCODE = "nanzan2026";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCcjISrD6HsF0EsrA6i8uoqK4XAUfsJFTc",
+  authDomain: "seat-reserve-94e1f.firebaseapp.com",
+  projectId: "seat-reserve-94e1f",
+  storageBucket: "seat-reserve-94e1f.firebasestorage.app",
+  messagingSenderId: "975102672764",
+  appId: "1:975102672764:web:3a0850eba04315abdf2ef9"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const $=s=>document.querySelector(s);
+
+/* ---- 共通ロジック ---- */
+function toHalf(s){return String(s==null?'':s).normalize('NFKC');}
+function validateStudentId(id){
+  const s=toHalf(id).trim();
+  if(!/^\d{7}$/.test(s))return'学籍番号は数字7桁で入力してください。';
+  const year=parseInt(s.slice(0,4),10),num=parseInt(s.slice(4,7),10);
+  if(year<2021||year>2026)return'入学年度（最初の4桁）が正しくありません（2021〜2026）。';
+  if(num<1||num>220)return'通し番号（最後の3桁）が正しくありません（001〜220）。';
+  return null;
+}
+function validateFurigana(s){
+  const v=toHalf(s).trim();
+  if(!v)return'ふりがなを入力してください。';
+  if(!/^[ぁ-んー\s]+$/u.test(v))return'ふりがなはひらがなで入力してください。';
+  return null;
+}
+function seatList(){const rows=['A','B','C'];const out=[];rows.forEach(r=>{for(let c=1;c<=10;c++)out.push(r+c);});return out;}
+function formatResNo(n){return String(n).padStart(4,'0');}
+function parseQrToken(text){
+  const parts=String(text||'').split('|');
+  if(parts.length!==3||parts[0]!=='NANZAN-KOENKAI')return null;
+  const resNo=parseInt(parts[1],10),seat=parts[2];
+  if(!resNo||!seat)return null;
+  return{resNo,seat};
+}
+function seatColor(v){if(!v||v.status!=='reserved')return'empty';return v.checkedIn?'checked':'reserved';}
+function matchesFilter(row,q){
+  if(!q)return true;
+  const k=toHalf(q).toLowerCase();
+  const hay=[row.id,row.resNo,row.lastName,row.firstName,row.lastFurigana,row.firstFurigana,row.studentId,row.grade,row.cls].join(' ').toLowerCase();
+  return hay.includes(k);
+}
+
+/* ---- パスコード ---- */
+$('#passBtn').addEventListener('click',enter);
+$('#passInput').addEventListener('keydown',e=>{if(e.key==='Enter')enter();});
+function enter(){
+  if($('#passInput').value===ADMIN_PASSCODE){
+    sessionStorage.setItem('admin_ok','1');
+    $('#gate').style.display='none';$('#app').style.display='block';
+    boot();
+  }else{$('#passErr').textContent='パスコードが違います。';}
+}
+if(sessionStorage.getItem('admin_ok')==='1'){$('#gate').style.display='none';$('#app').style.display='block';boot();}
+
+/* ---- タブ ---- */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');$('#panel-'+t.dataset.tab).classList.add('on');
+}));
+
+let seatsData={};let booted=false;
+function boot(){
+  if(booted)return;booted=true;
+  onSnapshot(collection(db,'seats'),snap=>{
+    seatsData={};
+    snap.forEach(d=>{seatsData[d.id]=d.data();});
+    renderTable();renderMap();renderForceSeatOptions();
+  });
+  $('#search').addEventListener('input',renderTable);
+  $('#camStart').addEventListener('click',startScan);
+  $('#camStop').addEventListener('click',stopScan);
+  $('#forceBtn').addEventListener('click',forceBook);
+}
+
+/* ---- 予約一覧 ---- */
+function renderTable(){
+  const q=$('#search').value;
+  const rows=Object.keys(seatsData).filter(id=>seatsData[id].status==='reserved')
+    .map(id=>({id,...seatsData[id]})).filter(r=>matchesFilter(r,q))
+    .sort((a,b)=>(a.resNo||0)-(b.resNo||0));
+  $('#tbody').innerHTML='';
+  $('#listMsg').textContent=rows.length+'件';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td>'+formatResNo(r.resNo)+'</td><td>'+r.id+'</td>'+
+      '<td>'+r.lastName+' '+r.firstName+'<br><span style="color:var(--muted);font-size:11px">'+r.lastFurigana+' '+r.firstFurigana+'</span></td>'+
+      '<td>'+r.grade+' '+r.cls+'組</td><td>'+r.studentId+'</td><td>'+r.birthdate+'</td>'+
+      '<td>'+(r.checkedIn?'<span class="chip c">受付済</span>':'<span class="chip r">未受付</span>')+'</td>'+
+      '<td></td>';
+    const td=tr.lastElementChild;
+    const toggleBtn=document.createElement('button');toggleBtn.className='btn small';toggleBtn.textContent=r.checkedIn?'受付取消':'手動チェックイン';
+    toggleBtn.addEventListener('click',()=>updateDoc(doc(db,'seats',r.id),{checkedIn:!r.checkedIn}));
+    const cancelBtn=document.createElement('button');cancelBtn.className='btn small ghost';cancelBtn.style.marginLeft='6px';cancelBtn.textContent='キャンセル';
+    cancelBtn.addEventListener('click',()=>{
+      if(confirm(r.id+'（'+r.lastName+' '+r.firstName+'）の予約をキャンセルしますか？')){
+        updateDoc(doc(db,'seats',r.id),{status:'empty',resNo:deleteField(),checkedIn:false,lastName:deleteField(),firstName:deleteField(),lastFurigana:deleteField(),firstFurigana:deleteField(),grade:deleteField(),cls:deleteField(),studentId:deleteField(),birthdate:deleteField()});
+      }
+    });
+    td.appendChild(toggleBtn);td.appendChild(cancelBtn);
+    $('#tbody').appendChild(tr);
+  });
+}
+
+/* ---- 座席マップ ---- */
+function renderMap(){
+  const rows=['A','B','C'];
+  $('#mapRows').innerHTML='';
+  rows.forEach(r=>{
+    const srow=document.createElement('div');srow.className='srow';
+    srow.innerHTML='<span class="rlabel">'+r+'</span>';
+    const seatsWrap=document.createElement('div');seatsWrap.className='seats';
+    for(let b=0;b<5;b++){
+      const blk=document.createElement('div');blk.className='blk';
+      for(let i=1;i<=2;i++){
+        const c=b*2+i;const id=r+c;
+        const v=seatsData[id];const color=seatColor(v);
+        const el=document.createElement('div');
+        el.className='seat2'+(color==='reserved'?' r':color==='checked'?' c':'');
+        el.textContent=id;
+        if(v&&v.status==='reserved')el.title=v.lastName+' '+v.firstName+'（'+formatResNo(v.resNo)+'）';
+        blk.appendChild(el);
+      }
+      seatsWrap.appendChild(blk);
+    }
+    srow.appendChild(seatsWrap);$('#mapRows').appendChild(srow);
+  });
+}
+
+/* ---- QRチェックイン ---- */
+let qr=null,scanning=false,lastHandled=0;
+function showResult(cls,title,sub){
+  const el=$('#result');el.className='result '+cls;
+  el.innerHTML='<div>'+title+'</div>'+(sub?('<p>'+sub+'</p>'):'');
+}
+async function onScan(text){
+  const now=Date.now();if(now-lastHandled<1500)return;lastHandled=now;
+  const t=parseQrToken(text);
+  if(!t){showResult('err','✕ 無効なQRコードです');return;}
+  try{
+    const ref=doc(db,'seats',t.seat);
+    const snap=await getDoc(ref);
+    if(!snap.exists()||snap.data().status!=='reserved'||snap.data().resNo!==t.resNo){
+      showResult('err','✕ 無効なQRコードです','座席：'+t.seat);return;
+    }
+    const v=snap.data();
+    if(v.checkedIn){
+      showResult('warn','⚠ 受付済みです（再提示）',v.lastName+' '+v.firstName+'　座席：'+t.seat);return;
+    }
+    await updateDoc(ref,{checkedIn:true});
+    showResult('ok','✓ 入場OK',v.lastName+' '+v.firstName+'　'+v.grade+' '+v.cls+'組　座席：'+t.seat);
+  }catch(e){showResult('err','通信エラーです。もう一度お試しください。');}
+}
+function startScan(){
+  if(scanning)return;
+  qr=new Html5Qrcode('reader');
+  qr.start({facingMode:'environment'},{fps:10,qrbox:220},onScan,()=>{})
+    .then(()=>{scanning=true;$('#camStart').style.display='none';$('#camStop').style.display='inline-block';})
+    .catch(()=>{showResult('err','カメラを起動できませんでした。カメラの使用許可を確認してください。');});
+}
+function stopScan(){
+  if(!scanning||!qr)return;
+  qr.stop().then(()=>{scanning=false;$('#camStart').style.display='inline-block';$('#camStop').style.display='none';});
+}
+
+/* ---- 強制予約 ---- */
+function renderForceSeatOptions(){
+  const sel=$('#fSeat');const cur=sel.value;
+  sel.innerHTML='';
+  seatList().forEach(id=>{
+    if(seatsData[id]&&seatsData[id].status==='reserved')return;
+    const o=document.createElement('option');o.value=id;o.textContent=id;sel.appendChild(o);
+  });
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+const fids=['fLastName','fFirstName','fLastFurigana','fFirstFurigana','fGrade','fCls','fStudentId','fBirthdate','fSeat'];
+async function forceBook(){
+  const f={};fids.forEach(id=>f[id]=$('#'+id).value);
+  const errors={};
+  if(!f.fLastName.trim())errors.fLastName='姓を入力してください。';
+  if(!f.fFirstName.trim())errors.fFirstName='名を入力してください。';
+  const lf=validateFurigana(f.fLastFurigana);if(lf)errors.fLastFurigana=lf;
+  const ff=validateFurigana(f.fFirstFurigana);if(ff)errors.fFirstFurigana=ff;
+  if(!f.fGrade)errors.fGrade='選択してください。';
+  if(!f.fCls)errors.fCls='選択してください。';
+  const idErr=validateStudentId(f.fStudentId);if(idErr)errors.fStudentId=idErr;
+  if(!f.fBirthdate)errors.fBirthdate='入力してください。';
+  if(!f.fSeat)errors.fSeat='座席を選んでください。';
+  fids.forEach(id=>{
+    const wrap=$('#f-'+id);
+    if(errors[id]){wrap.classList.add('invalid');wrap.querySelector('.err').textContent=errors[id];}
+    else wrap.classList.remove('invalid');
+  });
+  if(Object.keys(errors).length)return;
+  $('#forceBtn').disabled=true;$('#forceMsg').textContent='登録しています…';
+  try{
+    const resNo=await runTransaction(db, async tx=>{
+      const seatRef=doc(db,'seats',f.fSeat);
+      const seatSnap=await tx.get(seatRef);
+      if(seatSnap.exists()&&seatSnap.data().status==='reserved')throw new Error('TAKEN');
+      const counterRef=doc(db,'meta','counter');
+      const counterSnap=await tx.get(counterRef);
+      const next=counterSnap.exists()?(counterSnap.data().next||1):1;
+      tx.set(counterRef,{next:next+1});
+      tx.set(seatRef,{status:'reserved',resNo:next,checkedIn:false,createdAt:Date.now(),
+        lastName:f.fLastName,firstName:f.fFirstName,lastFurigana:f.fLastFurigana,firstFurigana:f.fFirstFurigana,
+        grade:f.fGrade,cls:f.fCls,studentId:f.fStudentId,birthdate:f.fBirthdate});
+      return next;
+    });
+    $('#forceMsg').textContent='予約番号 '+formatResNo(resNo)+' で登録しました。';
+    fids.forEach(id=>{if(id!=='fSeat')$('#'+id).value='';});
+  }catch(e){
+    $('#forceMsg').textContent=(e&&e.message==='TAKEN')?'その席はたった今、埋まりました。別の席を選んでください。':'登録に失敗しました。';
+  }finally{$('#forceBtn').disabled=false;}
+}
+</script>
+</body>
+</html>
