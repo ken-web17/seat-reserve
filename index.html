@@ -28,10 +28,10 @@ h1{font-family:"Shippori Mincho",serif;font-size:22px;margin:0 0 4px}
 h2{font-family:"Shippori Mincho",serif;font-size:19px;margin:0 0 10px}
 .sub{color:var(--muted);font-size:14px;margin:0 0 20px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.field{display:grid;gap:4px;margin-bottom:16px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:0}
+.field{display:grid;gap:4px;margin-bottom:16px;min-width:0}
 label{font-size:14px;font-weight:700}
-input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+input,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .err{color:var(--err);font-size:13px;display:none}
 .field.invalid input,.field.invalid select{border-color:var(--err);background:var(--err-bg)}
 .field.invalid .err{display:block}
