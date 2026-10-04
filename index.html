@@ -41,6 +41,10 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 .row{display:flex;gap:10px;margin-top:6px}
 .link{display:inline-block;margin-top:14px;font-size:14px;color:var(--accent);text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;font-family:inherit}
+.choice{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:12px;cursor:pointer;font-family:inherit}
+.choice:hover{border-color:var(--accent)}
+.choiceTitle{display:block;font-weight:700;font-size:17px;color:var(--ink)}
+.choiceSub{display:block;margin-top:4px;font-size:13px;color:var(--muted)}
 .note{margin-top:18px;padding:12px 14px;border-left:4px solid var(--accent);background:var(--surface);border-radius:0 6px 6px 0;font-size:13px;color:var(--muted)}
 .screen{display:none}
 .screen.on{display:block}
@@ -68,9 +72,8 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
 .selSummary{font-size:14px;margin:4px 0 16px;min-height:1.4em}
 .ticket{border:2px dashed var(--accent);border-radius:10px;padding:20px;text-align:center}
 .resno{font-size:13px;color:var(--muted);letter-spacing:.08em}
-#qr{display:flex;justify-content:center;margin:12px 0}
-#qr .barcodeBox{background:#ffffff;padding:14px 10px;border-radius:8px;display:inline-flex;max-width:100%;overflow-x:auto}
-#qr canvas{display:block;max-width:100%}
+.barcodeBox{background:#ffffff;padding:14px;border-radius:10px;width:100%;max-width:360px;margin:0 auto;box-sizing:border-box}
+.barcodeBox canvas{display:block;width:100%;height:auto}
 .tinfo{text-align:left;font-size:14px;margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
 .tinfo div{display:flex;justify-content:space-between;padding:3px 0}
 .tinfo b{font-weight:700}
@@ -85,7 +88,18 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
 <body>
 <main class="wrap">
 
-<section class="screen on" id="screen-form">
+<section class="screen on" id="screen-home">
+  <h1>南山生 座席予約システム</h1>
+  <p class="sub">ご希望の操作を選んでください。</p>
+  <button class="choice" type="button" data-go="form"><span class="choiceTitle">新しく予約する</span></button>
+  <button class="choice" type="button" data-go="cancel">
+    <span class="choiceTitle">予約の確認・キャンセル</span>
+    <span class="choiceSub">QRコードの表示もこちら</span>
+  </button>
+</section>
+
+<section class="screen" id="screen-form">
+  <button class="link" type="button" data-go="home">← トップへ戻る</button>
   <h1>南山生 座席予約システム</h1>
   <p class="sub">必要事項を入力してください。</p>
   <form class="card" id="form" novalidate>
@@ -117,7 +131,7 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
     <div class="field" id="f-birthdate"><label>生年月日</label><input id="birthdate" type="date"><p class="err"></p></div>
     <button class="btn" type="submit">座席を選ぶ</button>
   </form>
-  <button class="link" type="button" data-go="cancel">予約のキャンセル・変更はこちら</button>
+
 </section>
 
 <section class="screen" id="screen-seats">
@@ -214,7 +228,7 @@ function validateForm(f){
 }
 function seatList(){const rows=['A','B','C'];const out=[];rows.forEach(r=>{for(let c=1;c<=10;c++)out.push(r+c);});return out;}
 function formatResNo(n){return String(n).padStart(4,'0');}
-function qrToken(resNo,seat){return 'NANZAN-KOENKAI|'+formatResNo(resNo)+'|'+seat;}
+function qrToken(resNo,name){return resNo+'-'+name;}
 
 /* ---- 画面切り替え ---- */
 const $=s=>document.querySelector(s);
@@ -312,9 +326,9 @@ $('#confirmSeat').addEventListener('click', async ()=>{
 function drawBarcode(token){
   $('#qr').innerHTML='<div class="barcodeBox"><canvas id="barcodeCanvas"></canvas></div>';
   try{
-    bwipjs.toCanvas('barcodeCanvas',{bcid:'pdf417',text:token,scale:3,columns:6,padding:6});
+    bwipjs.toCanvas('barcodeCanvas',{bcid:'qrcode',text:token,scale:8,eclevel:'M'});
   }catch(e){
-    $('#qr').innerHTML='<p class="err" style="display:block">バーコードを生成できませんでした。</p>';
+    $('#qr').innerHTML='<p class="err" style="display:block">QRコードを生成できませんでした。</p>';
   }
 }
 
@@ -325,7 +339,7 @@ function showTicket(resNo,seat,f){
   $('#t-class').textContent=f.grade+' '+f.cls+'組';
   $('#t-sid').textContent=f.studentId;
   $('#t-seat').textContent=seat;
-  drawBarcode(qrToken(resNo,seat));
+  drawBarcode(qrToken(resNo,f.lastName+f.firstName));
   show('screen-ticket');
 }
 
@@ -363,8 +377,8 @@ $('#searchBtn').addEventListener('click', async ()=>{
         '<button class="btn ghost" type="button" onclick="window.print()">印刷する</button>'+
         '<button class="btn" type="button" id="doCancelBtn" style="margin-top:10px">このご予約をキャンセルする</button>'+
         '<p class="note">変更したい場合は、一度キャンセルしてから、もう一度予約画面からご登録ください。</p>';
-      $('#cancelBarcode').innerHTML='<div class="barcodeBox" style="display:inline-flex"><canvas id="cancelBarcodeCanvas"></canvas></div>';
-      try{bwipjs.toCanvas('cancelBarcodeCanvas',{bcid:'pdf417',text:qrToken(hit.resNo,hit.id),scale:3,columns:6,padding:6});}catch(e){}
+      $('#cancelBarcode').innerHTML='<div class="barcodeBox"><canvas id="cancelBarcodeCanvas"></canvas></div>';
+      try{bwipjs.toCanvas('cancelBarcodeCanvas',{bcid:'qrcode',text:qrToken(hit.resNo,hit.lastName+hit.firstName),scale:8,eclevel:'M'});}catch(e){}
       $('#doCancelBtn').addEventListener('click', async ()=>{
         $('#doCancelBtn').disabled=true;
         await updateDoc(doc(db,'seats',foundSeatId),{status:'empty',resNo:null,checkedIn:false,lastName:null,firstName:null,lastFurigana:null,firstFurigana:null,grade:null,cls:null,studentId:null,birthdate:null});
