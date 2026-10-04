@@ -28,7 +28,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic
 .wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px;min-width:0}
 h1{font-family:"Shippori Mincho",serif;font-size:21px;margin:0 0 16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
-input,select{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+input,select{width:100%;font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .btn{font:inherit;font-weight:700;font-size:15px;padding:10px 18px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 .btn.small{font-size:13px;padding:6px 12px}
@@ -73,8 +73,8 @@ th{color:var(--muted);font-weight:700}
 .seat2.r{background:var(--seatR);border-color:var(--seatR);color:#1a1405}
 .seat2.c{background:var(--seatC);border-color:var(--seatC);color:#06240f}
 .forceCard{margin-top:18px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.field{display:grid;gap:4px;margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}
+.field{display:grid;gap:4px;margin-bottom:12px;min-width:0}
 label{font-size:13px;font-weight:700}
 .err{color:var(--err);font-size:12px;display:none}
 .field.invalid input,.field.invalid select{border-color:var(--err)}
@@ -328,21 +328,15 @@ function renderMap(){
   });
 }
 
-/* ---- 効果音（合成音。ファイル不要） ---- */
-let actx=null;
-function tone(freq,start,dur,type,gain){
-  if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();
-  const o=actx.createOscillator(),g=actx.createGain();
-  o.type=type||'sine';o.frequency.value=freq;
-  g.gain.setValueAtTime(0,actx.currentTime+start);
-  g.gain.linearRampToValueAtTime(gain||0.2,actx.currentTime+start+0.01);
-  g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+start+dur);
-  o.connect(g);g.connect(actx.destination);
-  o.start(actx.currentTime+start);o.stop(actx.currentTime+start+dur+0.02);
-}
-function playOk(){tone(880,0,0.12,'sine',0.2);tone(1320,0.1,0.18,'sine',0.2);}
-function playWarn(){tone(600,0,0.15,'triangle',0.2);tone(600,0.18,0.15,'triangle',0.2);}
-function playErr(){tone(220,0,0.25,'sawtooth',0.15);}
+/* ---- 効果音（アップロードされた音声ファイル） ---- */
+const sndOk=new Audio('success.mp3');
+const sndWarn=new Audio('already-checked.mp3');
+const sndErr=new Audio('error.mp3');
+[sndOk,sndWarn,sndErr].forEach(a=>{a.preload='auto';});
+function playSound(a){try{a.currentTime=0;a.play().catch(()=>{});}catch(e){}}
+function playOk(){playSound(sndOk);}
+function playWarn(){playSound(sndWarn);}
+function playErr(){playSound(sndErr);}
 
 /* ---- QRチェックイン ---- */
 let qr=null,scanning=false,lastHandled=0,processing=false;
