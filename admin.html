@@ -162,7 +162,8 @@ label{font-size:13px;font-weight:700}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, updateDoc, deleteField, runTransaction, onSnapshot, collection
+  getFirestore, doc, getDoc, updateDoc, deleteField, runTransaction, onSnapshot, collection,
+  query, where, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 /* ここを変えれば、運営用パスコードを変更できます */
@@ -199,11 +200,13 @@ function validateFurigana(s){
 function seatList(){const rows=['A','B','C'];const out=[];rows.forEach(r=>{for(let c=1;c<=10;c++)out.push(r+c);});return out;}
 function formatResNo(n){return String(n).padStart(4,'0');}
 function parseQrToken(text){
-  const parts=String(text||'').split('|');
-  if(parts.length!==3||parts[0]!=='NANZAN-KOENKAI')return null;
-  const resNo=parseInt(parts[1],10),seat=parts[2];
-  if(!resNo||!seat)return null;
-  return{resNo,seat};
+  const s=String(text||'');
+  const i=s.indexOf('-');
+  if(i<0)return null;
+  const resNo=parseInt(s.slice(0,i),10);
+  const name=s.slice(i+1).trim();
+  if(!resNo||!name)return null;
+  return{resNo,name};
 }
 function seatColor(v){if(!v||v.status!=='reserved')return'empty';return v.checkedIn?'checked':'reserved';}
 function matchesFilter(row,q){
@@ -214,7 +217,7 @@ function matchesFilter(row,q){
 }
 
 /* ---- パスコード ---- */
-const SCAN_FORMATS=[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.PDF_417];
+const SCAN_FORMATS=[Html5QrcodeSupportedFormats.QR_CODE];
 $('#passBtn').addEventListener('click',enter);
 $('#passInput').addEventListener('keydown',e=>{if(e.key==='Enter')enter();});
 function enter(){
@@ -325,7 +328,23 @@ function renderMap(){
   });
 }
 
-/* ---- QR／バーコード チェックイン ---- */
+/* ---- 効果音（合成音。ファイル不要） ---- */
+let actx=null;
+function tone(freq,start,dur,type,gain){
+  if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type=type||'sine';o.frequency.value=freq;
+  g.gain.setValueAtTime(0,actx.currentTime+start);
+  g.gain.linearRampToValueAtTime(gain||0.2,actx.currentTime+start+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+start+dur);
+  o.connect(g);g.connect(actx.destination);
+  o.start(actx.currentTime+start);o.stop(actx.currentTime+start+dur+0.02);
+}
+function playOk(){tone(880,0,0.12,'sine',0.2);tone(1320,0.1,0.18,'sine',0.2);}
+function playWarn(){tone(600,0,0.15,'triangle',0.2);tone(600,0.18,0.15,'triangle',0.2);}
+function playErr(){tone(220,0,0.25,'sawtooth',0.15);}
+
+/* ---- QRチェックイン ---- */
 let qr=null,scanning=false,lastHandled=0,processing=false;
 function showResult(cls,title,sub){
   const el=$('#result');el.className='result '+cls;
@@ -336,19 +355,20 @@ async function onScan(text){
   if(qr&&scanning){try{qr.pause(true);}catch(e){}}
   try{
     const t=parseQrToken(text);
-    if(!t){showResult('err','✕ 無効なコードです');return;}
-    const ref=doc(db,'seats',t.seat);
-    const snap=await getDoc(ref);
-    if(!snap.exists()||snap.data().status!=='reserved'||snap.data().resNo!==t.resNo){
-      showResult('err','✕ 無効なコードです','座席：'+t.seat);return;
+    if(!t){showResult('err','✕ 無効なコードです');playErr();return;}
+    const q=query(collection(db,'seats'),where('resNo','==',t.resNo));
+    const snap=await getDocs(q);
+    let hit=null;
+    snap.forEach(d=>{const v=d.data();if(v.status==='reserved')hit={id:d.id,...v};});
+    if(!hit||!t.name.startsWith(hit.lastName||'\u0000')){
+      showResult('err','✕ 無効なコードです','予約番号：'+formatResNo(t.resNo));playErr();return;
     }
-    const v=snap.data();
-    if(v.checkedIn){
-      showResult('warn','⚠ 受付済みです（再提示）',v.lastName+' '+v.firstName+'　座席：'+t.seat);return;
+    if(hit.checkedIn){
+      showResult('warn','⚠ 受付済みです（再提示）',hit.lastName+' '+hit.firstName+'　座席：'+hit.id);playWarn();return;
     }
-    await updateDoc(ref,{checkedIn:true});
-    showResult('ok','✓ 入場OK',v.lastName+' '+v.firstName+'　'+v.grade+' '+v.cls+'組　座席：'+t.seat);
-  }catch(e){showResult('err','通信エラーです。もう一度お試しください。');}
+    await updateDoc(doc(db,'seats',hit.id),{checkedIn:true});
+    showResult('ok','✓ 入場OK',hit.lastName+' '+hit.firstName+'　'+hit.grade+' '+hit.cls+'組　座席：'+hit.id);playOk();
+  }catch(e){showResult('err','通信エラーです。もう一度お試しください。');playErr();}
   finally{
     processing=false;
     if(qr&&scanning){try{qr.resume();}catch(e){}}
