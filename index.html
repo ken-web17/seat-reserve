@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bwip-js@4.11.4/dist/bwip-js-min.js"></script>
 <style>
 :root{
   box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
@@ -21,7 +21,8 @@
 :root[data-theme="dark"]{--bg:#15181d; --surface:#1f242b; --ink:#eceef1; --muted:#9aa4b0; --line:#333a44; --accent:#e4625f; --accent-ink:#1a0d0d; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatT:#454c57;}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7;overflow-x:hidden}
+.wrap{min-width:0}
 .wrap{max-width:560px;margin:0 auto;padding:28px 18px 60px}
 h1{font-family:"Shippori Mincho",serif;font-size:22px;margin:0 0 4px}
 h2{font-family:"Shippori Mincho",serif;font-size:19px;margin:0 0 10px}
@@ -51,24 +52,32 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
 .dot.s{background:var(--seatSel)}
 .screenLabel{text-align:center;font-size:12px;color:var(--muted);margin:0 0 14px;border-bottom:1px dashed var(--line);padding-bottom:10px}
 .rows{display:grid;gap:10px;margin-bottom:16px}
-.srow{display:flex;align-items:center;gap:10px}
-.rlabel{width:20px;font-size:12px;color:var(--muted);font-weight:700}
-.seats{display:flex;gap:4px}
-.blk{display:flex;gap:4px;padding:3px;border-radius:6px}
-.seat{width:28px;height:28px;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);cursor:pointer;font-size:0}
+.srow{display:flex;align-items:center;gap:6px;min-width:0}
+.rlabel{width:16px;flex:0 0 auto;font-size:12px;color:var(--muted);font-weight:700}
+.seats{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px;min-width:0}
+.blk{display:flex;gap:3px;padding:2px;border-radius:6px;flex:0 0 auto}
+.seat{width:26px;height:26px;flex:0 0 auto;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);cursor:pointer;font-size:0}
+@media (min-width:420px){
+  .rlabel{width:20px}
+  .seats{gap:4px}
+  .blk{gap:4px;padding:3px}
+  .seat{width:28px;height:28px}
+}
 .seat.taken{background:var(--seatT);border-color:var(--seatT);cursor:not-allowed}
 .seat.sel{background:var(--seatSel);border-color:var(--seatSel)}
 .selSummary{font-size:14px;margin:4px 0 16px;min-height:1.4em}
 .ticket{border:2px dashed var(--accent);border-radius:10px;padding:20px;text-align:center}
 .resno{font-size:13px;color:var(--muted);letter-spacing:.08em}
 #qr{display:flex;justify-content:center;margin:12px 0}
+#qr .barcodeBox{background:#ffffff;padding:14px 10px;border-radius:8px;display:inline-flex;max-width:100%;overflow-x:auto}
+#qr canvas{display:block;max-width:100%}
 .tinfo{text-align:left;font-size:14px;margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
 .tinfo div{display:flex;justify-content:space-between;padding:3px 0}
 .tinfo b{font-weight:700}
 @media print{
   body *{visibility:hidden}
-  #screen-ticket,#screen-ticket *{visibility:visible}
-  #screen-ticket{position:absolute;left:0;top:0;width:100%}
+  #screen-ticket,#screen-ticket *,#cancelResult,#cancelResult *{visibility:visible}
+  #screen-ticket,#cancelResult{position:absolute;left:0;top:0;width:100%}
   .link,.btn,.note{display:none!important}
 }
 </style>
@@ -140,17 +149,13 @@ input,select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(
   </div>
   <p class="note">入場にはQRコードをタブレット等の端末での呈示が必要です。プリントアウトしたQRコードで入場することもできます。</p>
   <button class="btn" type="button" onclick="window.print()">印刷する</button>
-  <button class="link" type="button" data-go="cancel">予約のキャンセル・変更はこちら</button>
+  <button class="link" type="button" data-go="cancel">予約の確認・キャンセルはこちら</button>
 </section>
 
 <section class="screen" id="screen-cancel">
-  <h1>予約のキャンセル・変更</h1>
-  <p class="sub">本人確認のため、ふりがな・学籍番号・生年月日を入力してください。一致した予約のみキャンセルできます。</p>
+  <h1>予約の確認・キャンセル</h1>
+  <p class="sub">学籍番号・生年月日を入力してください。一致した予約を表示します（入場券の再表示にも使えます）。</p>
   <div class="card">
-    <div class="row2">
-      <div class="field" id="f-c-lastFurigana"><label>せい（ふりがな）</label><input id="c-lastFurigana"><p class="err"></p></div>
-      <div class="field" id="f-c-firstFurigana"><label>めい（ふりがな）</label><input id="c-firstFurigana"><p class="err"></p></div>
-    </div>
     <div class="field" id="f-c-studentId"><label>学籍番号（7桁）</label><input id="c-studentId" inputmode="numeric" maxlength="7"><p class="err"></p></div>
     <div class="field" id="f-c-birthdate"><label>生年月日</label><input id="c-birthdate" type="date"><p class="err"></p></div>
     <button class="btn" type="button" id="searchBtn">確認する</button>
@@ -303,6 +308,16 @@ $('#confirmSeat').addEventListener('click', async ()=>{
   }
 });
 
+/* ---- バーコード（PDF417） ---- */
+function drawBarcode(token){
+  $('#qr').innerHTML='<div class="barcodeBox"><canvas id="barcodeCanvas"></canvas></div>';
+  try{
+    bwipjs.toCanvas('barcodeCanvas',{bcid:'pdf417',text:token,scale:3,columns:6,padding:6});
+  }catch(e){
+    $('#qr').innerHTML='<p class="err" style="display:block">バーコードを生成できませんでした。</p>';
+  }
+}
+
 /* ---- ステップ3：チケット ---- */
 function showTicket(resNo,seat,f){
   $('#t-resno').textContent='予約番号 '+formatResNo(resNo);
@@ -310,19 +325,16 @@ function showTicket(resNo,seat,f){
   $('#t-class').textContent=f.grade+' '+f.cls+'組';
   $('#t-sid').textContent=f.studentId;
   $('#t-seat').textContent=seat;
-  $('#qr').innerHTML='';
-  new QRCode($('#qr'),{text:qrToken(resNo,seat),width:160,height:160});
+  drawBarcode(qrToken(resNo,seat));
   show('screen-ticket');
 }
 
-/* ---- キャンセル ---- */
-const cids=['c-lastFurigana','c-firstFurigana','c-studentId','c-birthdate'];
+/* ---- 予約の確認・キャンセル ---- */
+const cids=['c-studentId','c-birthdate'];
 let foundSeatId=null;
 $('#searchBtn').addEventListener('click', async ()=>{
-  const f={lastFurigana:$('#c-lastFurigana').value,firstFurigana:$('#c-firstFurigana').value,studentId:$('#c-studentId').value,birthdate:$('#c-birthdate').value};
+  const f={studentId:$('#c-studentId').value,birthdate:$('#c-birthdate').value};
   const errors={};
-  const lf=validateFurigana(f.lastFurigana);if(lf)errors['c-lastFurigana']=lf;
-  const ff=validateFurigana(f.firstFurigana);if(ff)errors['c-firstFurigana']=ff;
   const idErr=validateStudentId(f.studentId);if(idErr)errors['c-studentId']=idErr;
   if(!f.birthdate)errors['c-birthdate']='生年月日を入力してください。';
   cids.forEach(id=>{
@@ -339,7 +351,7 @@ $('#searchBtn').addEventListener('click', async ()=>{
     let hit=null;
     snap.forEach(d=>{
       const v=d.data();
-      if(v.status==='reserved'&&v.lastFurigana===f.lastFurigana.trim()&&v.firstFurigana===f.firstFurigana.trim()&&v.birthdate===f.birthdate){hit={id:d.id,...v};}
+      if(v.status==='reserved'&&v.birthdate===f.birthdate){hit={id:d.id,...v};}
     });
     if(!hit){box.innerHTML='一致する予約が見つかりませんでした。入力内容をご確認ください。';}
     else{
@@ -347,8 +359,12 @@ $('#searchBtn').addEventListener('click', async ()=>{
       box.innerHTML=
         '<p><b>予約番号 '+formatResNo(hit.resNo)+'</b><br>'+
         hit.lastName+' '+hit.firstName+'　'+hit.grade+' '+hit.cls+'組　座席：'+hit.id+'</p>'+
-        '<button class="btn" type="button" id="doCancelBtn">このご予約をキャンセルする</button>'+
+        '<div id="cancelBarcode" style="margin:12px 0"></div>'+
+        '<button class="btn ghost" type="button" onclick="window.print()">印刷する</button>'+
+        '<button class="btn" type="button" id="doCancelBtn" style="margin-top:10px">このご予約をキャンセルする</button>'+
         '<p class="note">変更したい場合は、一度キャンセルしてから、もう一度予約画面からご登録ください。</p>';
+      $('#cancelBarcode').innerHTML='<div class="barcodeBox" style="display:inline-flex"><canvas id="cancelBarcodeCanvas"></canvas></div>';
+      try{bwipjs.toCanvas('cancelBarcodeCanvas',{bcid:'pdf417',text:qrToken(hit.resNo,hit.id),scale:3,columns:6,padding:6});}catch(e){}
       $('#doCancelBtn').addEventListener('click', async ()=>{
         $('#doCancelBtn').disabled=true;
         await updateDoc(doc(db,'seats',foundSeatId),{status:'empty',resNo:null,checkedIn:false,lastName:null,firstName:null,lastFurigana:null,firstFurigana:null,grade:null,cls:null,studentId:null,birthdate:null});
