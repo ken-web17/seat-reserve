@@ -24,8 +24,8 @@
   --ok:#6fd499; --ok-bg:#163826; --warn:#e3b341; --warn-bg:#352a0f; --err:#ff8d85; --err-bg:#3a1b19; --seatE:#2a303a; --seatE-b:#3b4350; --seatR:#b68a2d; --seatC:#2f7a4c;}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7}
-.wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif;line-height:1.7;overflow-x:hidden}
+.wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px;min-width:0}
 h1{font-family:"Shippori Mincho",serif;font-size:21px;margin:0 0 16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
 input,select{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
@@ -40,7 +40,9 @@ input,select{font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(-
 .tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .panel{display:none}
 .panel.on{display:block}
-#reader{max-width:360px;margin:0 auto 14px;border-radius:8px;overflow:hidden}
+#reader{max-width:360px;width:100%;margin:0 auto 14px;border-radius:8px;overflow:hidden}
+#reader video,#reader img,#reader canvas,#gateReader video,#gateReader img,#gateReader canvas{max-width:100%;height:auto}
+#gateReader{max-width:320px;width:100%;margin:0 auto}
 .result{padding:16px;border-radius:8px;text-align:center;font-size:17px;font-weight:700;margin-bottom:14px;display:none}
 .result.ok{display:block;background:var(--ok-bg);color:var(--ok)}
 .result.warn{display:block;background:var(--warn-bg);color:var(--warn)}
@@ -62,11 +64,12 @@ th{color:var(--muted);font-weight:700}
 .dot.r{background:var(--seatR)}
 .dot.c{background:var(--seatC)}
 .rows{display:grid;gap:10px;margin-bottom:10px}
-.srow{display:flex;align-items:center;gap:10px}
+.srow{display:flex;align-items:center;gap:6px;min-width:0}
 .rlabel{width:20px;font-size:12px;color:var(--muted);font-weight:700}
-.seats{display:flex;gap:4px}
+.seats{display:flex;gap:3px;overflow-x:auto;padding-bottom:2px;min-width:0}
 .blk{display:flex;gap:4px;padding:3px;border-radius:6px}
-.seat2{width:30px;height:30px;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);font-size:9px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.seat2{width:27px;height:27px;flex:0 0 auto;border-radius:6px;background:var(--seatE);border:1px solid var(--seatE-b);font-size:8px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+@media (min-width:420px){.seats{gap:4px}.seat2{width:30px;height:30px;font-size:9px}}
 .seat2.r{background:var(--seatR);border-color:var(--seatR);color:#1a1405}
 .seat2.c{background:var(--seatC);border-color:var(--seatC);color:#06240f}
 .forceCard{margin-top:18px}
@@ -86,6 +89,8 @@ label{font-size:13px;font-weight:700}
   <input id="passInput" type="password" placeholder="パスコード" inputmode="numeric">
   <button class="btn" id="passBtn" style="width:100%">入る</button>
   <p class="err" id="passErr" style="display:block;min-height:1.4em"></p>
+  <button class="btn ghost" id="gateCamStart" style="width:100%;margin-top:4px">QR／バーコードを読み取ってログイン</button>
+  <div id="gateReader" style="margin-top:10px"></div>
 </div>
 
 <main class="wrap" id="app" style="display:none">
@@ -161,7 +166,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 /* ここを変えれば、運営用パスコードを変更できます */
-const ADMIN_PASSCODE = "nanzan2026";
+const ADMIN_PASSCODE = "0528316455";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCcjISrD6HsF0EsrA6i8uoqK4XAUfsJFTc",
@@ -209,22 +214,44 @@ function matchesFilter(row,q){
 }
 
 /* ---- パスコード ---- */
+const SCAN_FORMATS=[Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.PDF_417];
 $('#passBtn').addEventListener('click',enter);
 $('#passInput').addEventListener('keydown',e=>{if(e.key==='Enter')enter();});
 function enter(){
   if($('#passInput').value===ADMIN_PASSCODE){
     sessionStorage.setItem('admin_ok','1');
+    stopGateScan();
     $('#gate').style.display='none';$('#app').style.display='block';
     boot();
   }else{$('#passErr').textContent='パスコードが違います。';}
 }
 if(sessionStorage.getItem('admin_ok')==='1'){$('#gate').style.display='none';$('#app').style.display='block';boot();}
 
+let gateQr=null,gateScanning=false;
+$('#gateCamStart').addEventListener('click',()=>{
+  if(gateScanning){stopGateScan();return;}
+  gateQr=new Html5Qrcode('gateReader',{formatsToSupport:SCAN_FORMATS});
+  gateQr.start({facingMode:'environment'},{fps:10,qrbox:220},text=>{
+    $('#passInput').value=text;enter();
+  },()=>{})
+    .then(()=>{gateScanning=true;$('#gateCamStart').textContent='カメラを止める';})
+    .catch(()=>{$('#passErr').textContent='カメラを起動できませんでした。';});
+});
+function stopGateScan(){
+  if(!gateScanning||!gateQr)return;
+  gateQr.stop().then(()=>{gateScanning=false;$('#gateCamStart').textContent='QR／バーコードを読み取ってログイン';}).catch(()=>{});
+}
+
 /* ---- タブ ---- */
+let activeTab='checkin';
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
   t.classList.add('on');$('#panel-'+t.dataset.tab).classList.add('on');
+  activeTab=t.dataset.tab;
+  if(activeTab!=='checkin')stopScan();
+  if(activeTab==='list'){renderTable();renderForceSeatOptions();}
+  if(activeTab==='map')renderMap();
 }));
 
 let seatsData={};let booted=false;
@@ -233,7 +260,9 @@ function boot(){
   onSnapshot(collection(db,'seats'),snap=>{
     seatsData={};
     snap.forEach(d=>{seatsData[d.id]=d.data();});
-    renderTable();renderMap();renderForceSeatOptions();
+    // スキャン中に表の作り直しが重なるとカメラ処理が詰まるので、今見えているタブだけ更新する
+    if(activeTab==='list'){renderTable();renderForceSeatOptions();}
+    if(activeTab==='map')renderMap();
   });
   $('#search').addEventListener('input',renderTable);
   $('#camStart').addEventListener('click',startScan);
@@ -296,21 +325,22 @@ function renderMap(){
   });
 }
 
-/* ---- QRチェックイン ---- */
-let qr=null,scanning=false,lastHandled=0;
+/* ---- QR／バーコード チェックイン ---- */
+let qr=null,scanning=false,lastHandled=0,processing=false;
 function showResult(cls,title,sub){
   const el=$('#result');el.className='result '+cls;
   el.innerHTML='<div>'+title+'</div>'+(sub?('<p>'+sub+'</p>'):'');
 }
 async function onScan(text){
-  const now=Date.now();if(now-lastHandled<1500)return;lastHandled=now;
-  const t=parseQrToken(text);
-  if(!t){showResult('err','✕ 無効なQRコードです');return;}
+  const now=Date.now();if(processing||now-lastHandled<1500)return;lastHandled=now;processing=true;
+  if(qr&&scanning){try{qr.pause(true);}catch(e){}}
   try{
+    const t=parseQrToken(text);
+    if(!t){showResult('err','✕ 無効なコードです');return;}
     const ref=doc(db,'seats',t.seat);
     const snap=await getDoc(ref);
     if(!snap.exists()||snap.data().status!=='reserved'||snap.data().resNo!==t.resNo){
-      showResult('err','✕ 無効なQRコードです','座席：'+t.seat);return;
+      showResult('err','✕ 無効なコードです','座席：'+t.seat);return;
     }
     const v=snap.data();
     if(v.checkedIn){
@@ -319,17 +349,21 @@ async function onScan(text){
     await updateDoc(ref,{checkedIn:true});
     showResult('ok','✓ 入場OK',v.lastName+' '+v.firstName+'　'+v.grade+' '+v.cls+'組　座席：'+t.seat);
   }catch(e){showResult('err','通信エラーです。もう一度お試しください。');}
+  finally{
+    processing=false;
+    if(qr&&scanning){try{qr.resume();}catch(e){}}
+  }
 }
 function startScan(){
   if(scanning)return;
-  qr=new Html5Qrcode('reader');
+  qr=new Html5Qrcode('reader',{formatsToSupport:SCAN_FORMATS});
   qr.start({facingMode:'environment'},{fps:10,qrbox:220},onScan,()=>{})
     .then(()=>{scanning=true;$('#camStart').style.display='none';$('#camStop').style.display='inline-block';})
     .catch(()=>{showResult('err','カメラを起動できませんでした。カメラの使用許可を確認してください。');});
 }
 function stopScan(){
   if(!scanning||!qr)return;
-  qr.stop().then(()=>{scanning=false;$('#camStart').style.display='inline-block';$('#camStop').style.display='none';});
+  qr.stop().then(()=>{scanning=false;qr=null;$('#camStart').style.display='inline-block';$('#camStop').style.display='none';}).catch(()=>{scanning=false;qr=null;});
 }
 
 /* ---- 強制予約 ---- */
