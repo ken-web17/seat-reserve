@@ -82,7 +82,10 @@ input,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px
   #screen-ticket,#screen-ticket *,#cancelResult,#cancelResult *{visibility:visible}
   #screen-ticket,#cancelResult{position:absolute;left:0;top:0;width:100%}
   .link,.btn,.note{display:none!important}
+  .barcodeBox{max-width:200px!important;padding:10px!important}
+  .printTitle{display:block!important;font-family:"Shippori Mincho",serif;font-size:18px;font-weight:800;margin:0 0 10px;text-align:center}
 }
+.printTitle{display:none}
 </style>
 </head>
 <body>
@@ -224,6 +227,11 @@ function validateForm(f){
   if(!f.cls)errors.cls='クラスを選んでください。';
   const idErr=validateStudentId(f.studentId);if(idErr)errors.studentId=idErr;
   if(!f.birthdate)errors.birthdate='生年月日を入力してください。';
+  else{
+    const today=new Date();today.setHours(0,0,0,0);
+    const bd=new Date(f.birthdate+'T00:00:00');
+    if(isNaN(bd.getTime())||bd>today)errors.birthdate='生年月日が正しくありません（今日より後の日付は選べません）。';
+  }
   return errors;
 }
 function seatList(){const rows=['A','B','C'];const out=[];rows.forEach(r=>{for(let c=1;c<=10;c++)out.push(r+c);});return out;}
@@ -232,13 +240,19 @@ function qrToken(resNo,name){return resNo+'-'+name;}
 
 /* ---- 画面切り替え ---- */
 const $=s=>document.querySelector(s);
+(function(){
+  const todayStr=new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD（ローカル日付）
+  const a=$('#birthdate'),b=$('#c-birthdate');
+  if(a)a.max=todayStr;
+  if(b)b.max=todayStr;
+})();
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));$('#'+id).classList.add('on');window.scrollTo(0,0);}
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>show('screen-'+b.dataset.go)));
 
 /* ---- ステップ1：入力フォーム ---- */
 const ids=['lastName','firstName','lastFurigana','firstFurigana','grade','cls','studentId','birthdate'];
 let formData=null;
-$('#form').addEventListener('submit',e=>{
+$('#form').addEventListener('submit', async e=>{
   e.preventDefault();
   const f={};ids.forEach(id=>f[id]=$('#'+id).value);
   const errors=validateForm(f);
@@ -247,10 +261,29 @@ $('#form').addEventListener('submit',e=>{
     if(errors[id]){wrap.classList.add('invalid');wrap.querySelector('.err').textContent=errors[id];}
     else wrap.classList.remove('invalid');
   });
-  if(Object.keys(errors).length===0){
-    formData=f;show('screen-seats');startSeatListener();
-  }else{
+  if(Object.keys(errors).length){
     $('#f-'+Object.keys(errors)[0]).scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
+  const submitBtn=$('#form button[type=submit]');
+  submitBtn.disabled=true;const origLabel=submitBtn.textContent;submitBtn.textContent='確認しています…';
+  try{
+    const q=query(collection(db,'seats'),where('studentId','==',toHalf(f.studentId).trim()));
+    const snap=await getDocs(q);
+    let dup=false;
+    snap.forEach(d=>{if(d.data().status==='reserved')dup=true;});
+    if(dup){
+      const wrap=$('#f-studentId');wrap.classList.add('invalid');
+      wrap.querySelector('.err').textContent='この学籍番号は、すでに予約されています（お一人様1回までです）。';
+      wrap.scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+    formData=f;show('screen-seats');startSeatListener();
+  }catch(err){
+    $('#f-studentId').classList.add('invalid');
+    $('#f-studentId').querySelector('.err').textContent='通信エラーが発生しました。もう一度お試しください。';
+  }finally{
+    submitBtn.disabled=false;submitBtn.textContent=origLabel;
   }
 });
 
@@ -299,6 +332,13 @@ $('#confirmSeat').addEventListener('click', async ()=>{
   $('#confirmSeat').disabled=true;$('#seatErr').textContent='';
   const seat=selectedSeat;
   try{
+    const dupQ=query(collection(db,'seats'),where('studentId','==',toHalf(formData.studentId).trim()));
+    const dupSnap=await getDocs(dupQ);
+    let dup=false;dupSnap.forEach(d=>{if(d.data().status==='reserved')dup=true;});
+    if(dup){
+      $('#seatErr').textContent='この学籍番号は、すでに予約されています。';
+      $('#confirmSeat').disabled=false;return;
+    }
     const resNo=await runTransaction(db, async tx=>{
       const seatRef=doc(db,'seats',seat);
       const seatSnap=await tx.get(seatRef);
@@ -371,6 +411,7 @@ $('#searchBtn').addEventListener('click', async ()=>{
     else{
       foundSeatId=hit.id;
       box.innerHTML=
+        '<p class="printTitle">入場券</p>'+
         '<p><b>予約番号 '+formatResNo(hit.resNo)+'</b><br>'+
         hit.lastName+' '+hit.firstName+'　'+hit.grade+' '+hit.cls+'組　座席：'+hit.id+'</p>'+
         '<div id="cancelBarcode" style="margin:12px 0"></div>'+
